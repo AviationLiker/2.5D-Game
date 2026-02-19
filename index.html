@@ -40,12 +40,12 @@
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        // 1. SET YOUR LINK HERE
+        // REPLACE WITH YOUR LINK
         const SERVER_URL = "https://two-5d-game.onrender.com";
         
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
+        const socket = io(SERVER_URL); // Back to the original simple connection
         
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.onresize = resize; resize();
@@ -53,40 +53,20 @@
         let myId = null;
         let players = {};
         const me = { x: 200, y: 200, z: 0, jumpVel: 0, isGrounded: true, inputX: 0, inputY: 0 };
-        const colorPicker = document.getElementById('colorPicker');
 
         socket.on('init', (data) => { 
             myId = data.id; 
             me.x = data.player.x; 
-            me.y = data.player.y;
-            colorPicker.value = data.player.color;
+            me.y = data.player.y; 
         });
 
-        // --- NEW: COLOR PICKER LISTENER ---
-        colorPicker.addEventListener('input', () => {
-            if (!myId) return;
-            socket.emit('move', { 
-                x: me.x, y: me.y, z: me.z, 
-                color: colorPicker.value 
-            });
-        });
-
-        // Inputs & Chat
+        // Inputs
         const keys = {};
         window.onkeydown = (e) => {
-            if (e.key === '/') { 
-                e.preventDefault(); 
-                const input = document.getElementById('chat-input');
-                input.style.visibility = 'visible'; 
-                input.focus(); 
-            }
+            if (e.key === '/') { e.preventDefault(); document.getElementById('chat-input').style.visibility='visible'; document.getElementById('chat-input').focus(); }
             if (e.key === 'Enter' && document.activeElement.id === 'chat-input') {
-                if (document.activeElement.value.trim()) {
-                    socket.emit('chatMessage', document.activeElement.value.trim());
-                }
-                document.activeElement.value = ''; 
-                document.activeElement.blur(); 
-                document.activeElement.style.visibility = 'hidden';
+                if (e.target.value.trim()) socket.emit('chatMessage', e.target.value.trim());
+                e.target.value = ''; e.target.blur(); e.target.style.visibility = 'hidden';
             }
             keys[e.key.toLowerCase()] = true;
         };
@@ -112,8 +92,13 @@
             }
         }
 
-        document.getElementById('jump-btn').addEventListener('touchstart', () => {
+        document.getElementById('jump-btn').addEventListener('touchstart', (e) => {
             if (me.isGrounded) { me.jumpVel = 10; me.isGrounded = false; }
+        });
+
+        // COLOR FIX: Emit color change immediately when picked
+        document.getElementById('colorPicker').addEventListener('input', () => {
+            socket.emit('move', { x: me.x, y: me.y, z: me.z, color: document.getElementById('colorPicker').value });
         });
 
         function update() {
@@ -139,7 +124,7 @@
             }
 
             if (moved) {
-                socket.emit('move', { x: me.x, y: me.y, z: me.z, color: colorPicker.value });
+                socket.emit('move', { x: me.x, y: me.y, z: me.z, color: document.getElementById('colorPicker').value });
             }
         }
 
@@ -148,19 +133,15 @@
             Object.keys(players).forEach(id => {
                 const p = players[id];
                 const drawY = p.y - p.z - 30;
-                // Shadow
                 ctx.fillStyle = "rgba(0,0,0,0.1)";
                 ctx.beginPath(); ctx.ellipse(p.x, p.y, 15, 8, 0, 0, Math.PI*2); ctx.fill();
-                // Player
-                ctx.fillStyle = p.color || '#333';
+                ctx.fillStyle = p.color || "#3498db";
                 ctx.fillRect(p.x - 12, drawY, 24, 30);
-                if (id === myId) { ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.strokeRect(p.x-12, drawY, 24, 30); }
-                // Chat Bubble
+                if (id === myId) { ctx.strokeStyle = "#000"; ctx.strokeRect(p.x-12, drawY, 24, 30); }
                 if (p.lastMsg) {
-                    ctx.fillStyle = "white"; ctx.strokeStyle = "black"; ctx.lineWidth = 1;
-                    ctx.fillRect(p.x - 40, drawY - 35, 80, 20); ctx.strokeRect(p.x - 40, drawY - 35, 80, 20);
-                    ctx.fillStyle = "black"; ctx.textAlign = "center"; ctx.font = "10px sans-serif";
-                    ctx.fillText(p.lastMsg, p.x, drawY - 21);
+                    ctx.fillStyle = "white"; ctx.strokeStyle = "black";
+                    ctx.fillRect(p.x - 40, drawY - 30, 80, 20); ctx.strokeRect(p.x - 40, drawY - 30, 80, 20);
+                    ctx.fillStyle = "black"; ctx.textAlign = "center"; ctx.fillText(p.lastMsg, p.x, drawY - 16);
                 }
             });
             update();
@@ -179,4 +160,3 @@
     </script>
 </body>
 </html>
-
