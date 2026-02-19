@@ -40,12 +40,12 @@
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        // REPLACE THIS URL WITH YOUR LIVE RENDER LINK!
-        const SERVER_URL = "https://two-5d-game.onrender.com";
+        // 1. SET YOUR LINK HERE
+        const SERVER_URL = "https://your-game-name.onrender.com";
         
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const socket = io(SERVER_URL);
+        const socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
         
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.onresize = resize; resize();
@@ -53,22 +53,46 @@
         let myId = null;
         let players = {};
         const me = { x: 200, y: 200, z: 0, jumpVel: 0, isGrounded: true, inputX: 0, inputY: 0 };
+        const colorPicker = document.getElementById('colorPicker');
 
-        socket.on('init', (data) => { myId = data.id; me.x = data.player.x; me.y = data.player.y; });
+        socket.on('init', (data) => { 
+            myId = data.id; 
+            me.x = data.player.x; 
+            me.y = data.player.y;
+            colorPicker.value = data.player.color;
+        });
 
-        // Inputs
+        // --- NEW: COLOR PICKER LISTENER ---
+        colorPicker.addEventListener('input', () => {
+            if (!myId) return;
+            socket.emit('move', { 
+                x: me.x, y: me.y, z: me.z, 
+                color: colorPicker.value 
+            });
+        });
+
+        // Inputs & Chat
         const keys = {};
         window.onkeydown = (e) => {
-            if (e.key === '/') { e.preventDefault(); document.getElementById('chat-input').style.visibility='visible'; document.getElementById('chat-input').focus(); }
+            if (e.key === '/') { 
+                e.preventDefault(); 
+                const input = document.getElementById('chat-input');
+                input.style.visibility = 'visible'; 
+                input.focus(); 
+            }
             if (e.key === 'Enter' && document.activeElement.id === 'chat-input') {
-                if (e.target.value.trim()) socket.emit('chatMessage', e.target.value.trim());
-                e.target.value = ''; e.target.blur(); e.target.style.visibility = 'hidden';
+                if (document.activeElement.value.trim()) {
+                    socket.emit('chatMessage', document.activeElement.value.trim());
+                }
+                document.activeElement.value = ''; 
+                document.activeElement.blur(); 
+                document.activeElement.style.visibility = 'hidden';
             }
             keys[e.key.toLowerCase()] = true;
         };
         window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
 
-        // Joystick Logic
+        // Joystick
         const jBase = document.getElementById('joyBase');
         const stick = document.getElementById('stick');
         jBase.addEventListener('touchstart', handleJoy);
@@ -88,7 +112,7 @@
             }
         }
 
-        document.getElementById('jump-btn').addEventListener('touchstart', (e) => {
+        document.getElementById('jump-btn').addEventListener('touchstart', () => {
             if (me.isGrounded) { me.jumpVel = 10; me.isGrounded = false; }
         });
 
@@ -106,7 +130,6 @@
                 moved = true;
             }
 
-            // Screen Borders
             me.x = Math.max(20, Math.min(canvas.width-20, me.x));
             me.y = Math.max(20, Math.min(canvas.height-20, me.y));
 
@@ -116,8 +139,7 @@
             }
 
             if (moved) {
-                socket.emit('move', { x: me.x, y: me.y, z: me.z, color: document.getElementById('colorPicker').value });
-                if (players[myId]) Object.assign(players[myId], {x: me.x, y: me.y, z: me.z});
+                socket.emit('move', { x: me.x, y: me.y, z: me.z, color: colorPicker.value });
             }
         }
 
@@ -126,15 +148,19 @@
             Object.keys(players).forEach(id => {
                 const p = players[id];
                 const drawY = p.y - p.z - 30;
+                // Shadow
                 ctx.fillStyle = "rgba(0,0,0,0.1)";
                 ctx.beginPath(); ctx.ellipse(p.x, p.y, 15, 8, 0, 0, Math.PI*2); ctx.fill();
-                ctx.fillStyle = p.color;
+                // Player
+                ctx.fillStyle = p.color || '#333';
                 ctx.fillRect(p.x - 12, drawY, 24, 30);
-                if (id === myId) { ctx.strokeStyle = "#000"; ctx.strokeRect(p.x-12, drawY, 24, 30); }
+                if (id === myId) { ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.strokeRect(p.x-12, drawY, 24, 30); }
+                // Chat Bubble
                 if (p.lastMsg) {
-                    ctx.fillStyle = "white"; ctx.strokeStyle = "black";
-                    ctx.fillRect(p.x - 40, drawY - 30, 80, 20); ctx.strokeRect(p.x - 40, drawY - 30, 80, 20);
-                    ctx.fillStyle = "black"; ctx.textAlign = "center"; ctx.fillText(p.lastMsg, p.x, drawY - 16);
+                    ctx.fillStyle = "white"; ctx.strokeStyle = "black"; ctx.lineWidth = 1;
+                    ctx.fillRect(p.x - 40, drawY - 35, 80, 20); ctx.strokeRect(p.x - 40, drawY - 35, 80, 20);
+                    ctx.fillStyle = "black"; ctx.textAlign = "center"; ctx.font = "10px sans-serif";
+                    ctx.fillText(p.lastMsg, p.x, drawY - 21);
                 }
             });
             update();
@@ -152,5 +178,4 @@
         draw();
     </script>
 </body>
-
 </html>
