@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multiplayer Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; background: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
+        canvas { display: block; border: 4px solid #333; margin: 0 auto; box-sizing: border-box; }
+        
+        .ui-panel { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: white; padding: 8px; border-radius: 20px; z-index: 10; display: flex; gap: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); align-items: center; }
+        #chat-container { position: absolute; top: 60px; left: 15px; width: 180px; pointer-events: none; z-index: 5; }
+        #chat-messages { height: 100px; overflow: hidden; display: flex; flex-direction: column; gap: 4px; }
+        .message { background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; width: fit-content; }
+        #chat-input { width: 100%; background: rgba(0,0,0,0.8); border: 1px solid #fff; padding: 6px; color: white; visibility: hidden; pointer-events: auto; }
+
+        #mobile-controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-between; padding: 0 20px; box-sizing: border-box; pointer-events: none; }
+        .joy-base { width: 80px; height: 80px; background: rgba(0,0,0,0.1); border: 2px solid #333; border-radius: 50%; position: relative; pointer-events: auto; }
+        #stick { width: 30px; height: 30px; background: #333; border-radius: 50%; position: absolute; left: 25px; top: 25px; }
+        #jump-btn { width: 60px; height: 60px; background: #333; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: auto; }
+    </style>
+</head>
+<body>
+
+    <div class="ui-panel">
+        <input type="color" id="colorPicker" value="#3498db">
+        <span style="font-size: 11px;"><b>/</b> Chat | <b>WASD</b></span>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="chat-container">
+        <div id="chat-messages"></div>
+        <input type="text" id="chat-input" placeholder="Type..." maxlength="30">
+    </div>
+
+    <div id="mobile-controls">
+        <div class="joy-base" id="joyBase"><div id="stick"></div></div>
+        <div id="jump-btn">JUMP</div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        // REPLACE THIS URL WITH YOUR LIVE RENDER LINK!
+        const SERVER_URL = "https://YOUR-SERVER-NAME.onrender.com";
+        
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const socket = io(SERVER_URL);
+        
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.onresize = resize; resize();
+
+        let myId = null;
+        let players = {};
+        const me = { x: 200, y: 200, z: 0, jumpVel: 0, isGrounded: true, inputX: 0, inputY: 0 };
+
+        socket.on('init', (data) => { myId = data.id; me.x = data.player.x; me.y = data.player.y; });
+
+        // Inputs
+        const keys = {};
+        window.onkeydown = (e) => {
+            if (e.key === '/') { e.preventDefault(); document.getElementById('chat-input').style.visibility='visible'; document.getElementById('chat-input').focus(); }
+            if (e.key === 'Enter' && document.activeElement.id === 'chat-input') {
+                if (e.target.value.trim()) socket.emit('chatMessage', e.target.value.trim());
+                e.target.value = ''; e.target.blur(); e.target.style.visibility = 'hidden';
+            }
+            keys[e.key.toLowerCase()] = true;
+        };
+        window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
+
+        // Joystick Logic
+        const jBase = document.getElementById('joyBase');
+        const stick = document.getElementById('stick');
+        jBase.addEventListener('touchstart', handleJoy);
+        window.addEventListener('touchmove', handleJoy, {passive: false});
+        window.addEventListener('touchend', () => { me.inputX = 0; me.inputY = 0; stick.style.transform = `translate(0,0)`; });
+
+        function handleJoy(e) {
+            if(e.touches.length > 0) {
+                const r = jBase.getBoundingClientRect();
+                const dx = e.touches[0].clientX - (r.left + 40);
+                const dy = e.touches[0].clientY - (r.top + 40);
+                const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 30);
+                const angle = Math.atan2(dy, dx);
+                me.inputX = (Math.cos(angle) * dist) / 30;
+                me.inputY = (Math.sin(angle) * dist) / 30;
+                stick.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
+            }
+        }
+
+        document.getElementById('jump-btn').addEventListener('touchstart', (e) => {
+            if (me.isGrounded) { me.jumpVel = 10; me.isGrounded = false; }
+        });
+
+        function update() {
+            if (!myId) return;
+            let moved = false;
+            let mx = me.inputX, my = me.inputY;
+
+            if (keys['w']) my = -1; if (keys['s']) my = 1;
+            if (keys['a']) mx = -1; if (keys['d']) mx = 1;
+            if (keys[' '] && me.isGrounded) { me.jumpVel = 10; me.isGrounded = false; moved = true; }
+
+            if (mx !== 0 || my !== 0) {
+                me.x += mx * 4; me.y += my * 3;
+                moved = true;
+            }
+
+            // Screen Borders
+            me.x = Math.max(20, Math.min(canvas.width-20, me.x));
+            me.y = Math.max(20, Math.min(canvas.height-20, me.y));
+
+            if (!me.isGrounded) {
+                me.z += me.jumpVel; me.jumpVel -= 0.6; moved = true;
+                if (me.z <= 0) { me.z = 0; me.isGrounded = true; }
+            }
+
+            if (moved) {
+                socket.emit('move', { x: me.x, y: me.y, z: me.z, color: document.getElementById('colorPicker').value });
+                if (players[myId]) Object.assign(players[myId], {x: me.x, y: me.y, z: me.z});
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            Object.keys(players).forEach(id => {
+                const p = players[id];
+                const drawY = p.y - p.z - 30;
+                ctx.fillStyle = "rgba(0,0,0,0.1)";
+                ctx.beginPath(); ctx.ellipse(p.x, p.y, 15, 8, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x - 12, drawY, 24, 30);
+                if (id === myId) { ctx.strokeStyle = "#000"; ctx.strokeRect(p.x-12, drawY, 24, 30); }
+                if (p.lastMsg) {
+                    ctx.fillStyle = "white"; ctx.strokeStyle = "black";
+                    ctx.fillRect(p.x - 40, drawY - 30, 80, 20); ctx.strokeRect(p.x - 40, drawY - 30, 80, 20);
+                    ctx.fillStyle = "black"; ctx.textAlign = "center"; ctx.fillText(p.lastMsg, p.x, drawY - 16);
+                }
+            });
+            update();
+            requestAnimationFrame(draw);
+        }
+
+        socket.on('updatePlayers', (data) => { players = data; });
+        socket.on('newChatMessage', (data) => {
+            const m = document.createElement('div'); m.className = 'message';
+            m.innerHTML = `<b>${data.id}:</b> ${data.text}`;
+            document.getElementById('chat-messages').appendChild(m);
+            setTimeout(() => m.remove(), 5000);
+        });
+
+        draw();
+    </script>
+</body>
+</html>
