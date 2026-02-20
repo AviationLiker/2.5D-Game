@@ -53,6 +53,7 @@
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
         const SERVER_URL = "https://two-5d-game.onrender.com"; // <-- REPLACE THIS
         
@@ -72,7 +73,6 @@
         const me = { x: 300, y: 300, z: 0, jv: 0, ground: true, ix: 0, iy: 0, nick: "", color: "#3498db" };
         const keys = {};
 
-        // 1. START GAME LOOP IMMEDIATELY
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.onresize = resize; resize();
 
@@ -84,10 +84,7 @@
             mobileControls.style.display = 'flex';
             document.getElementById('display-name').innerText = me.nick;
             
-            // Start Local Loop
             requestAnimationFrame(draw);
-            
-            // Connect to Server
             connectToServer();
         };
 
@@ -115,15 +112,27 @@
                 chatInput.value = ''; chatInput.style.visibility = 'hidden'; chatInput.blur();
             } else { chatInput.style.visibility = 'visible'; chatInput.focus(); }
         }
+
         window.onkeydown = (e) => {
             if (e.key === '/') { e.preventDefault(); toggleChat(); }
             if (e.key === 'Enter' && document.activeElement === chatInput) toggleChat();
+            if (e.key === ' ' && me.ground) { me.jv = 10; me.ground = false; } // Keyboard Jump
             keys[e.key.toLowerCase()] = true;
         };
         window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
-        document.getElementById('chat-btn').ontouchstart = (e) => { e.preventDefault(); toggleChat(); };
-        document.getElementById('jump-btn').ontouchstart = (e) => { e.preventDefault(); if (me.ground) { me.jv = 10; me.ground = false; } };
 
+        // Mobile Jump Fix
+        document.getElementById('jump-btn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (me.ground) { 
+                me.jv = 10; 
+                me.ground = false; 
+            }
+        });
+
+        document.getElementById('chat-btn').ontouchstart = (e) => { e.preventDefault(); toggleChat(); };
+
+        // Joystick
         const jBase = document.getElementById('joyBase');
         const stick = document.getElementById('stick');
         jBase.ontouchstart = jBase.ontouchmove = (e) => {
@@ -142,13 +151,35 @@
         function update() {
             let moved = false;
             let mx = me.ix, my = me.iy;
+            
+            // Movement logic
             if (keys['w']) my = -1; if (keys['s']) my = 1;
             if (keys['a']) mx = -1; if (keys['d']) mx = 1;
-            if (mx !== 0 || my !== 0) { me.x += mx * 4; me.y += my * 3; moved = true; }
-            if (!me.ground) { me.z += me.jv; me.jv -= 0.6; moved = true; if (me.z <= 0) { me.z = 0; me.ground = true; } }
             
-            // Sync with server if connected
-            if (socket && (moved || keys['w'] || keys['a'] || keys['s'] || keys['d'])) {
+            if (mx !== 0 || my !== 0) { 
+                me.x += mx * 4; 
+                me.y += my * 3; 
+                moved = true; 
+            }
+
+            // Physics logic (JUMPING)
+            if (!me.ground) {
+                me.z += me.jv;
+                me.jv -= 0.6; // Gravity
+                moved = true;
+                if (me.z <= 0) {
+                    me.z = 0;
+                    me.jv = 0;
+                    me.ground = true;
+                }
+            }
+            
+            // Boundary checks
+            me.x = Math.max(20, Math.min(canvas.width - 20, me.x));
+            me.y = Math.max(20, Math.min(canvas.height - 20, me.y));
+            
+            // Sync with server
+            if (socket && moved) {
                 socket.emit('move', { x: me.x, y: me.y, z: me.z, color: colorPicker.value, nick: me.nick });
             }
         }
@@ -156,7 +187,7 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Draw My Character Always
+            // Draw My Character
             drawCube(me.x, me.y, me.z, colorPicker.value, me.nick, true);
 
             // Draw Other Players
@@ -189,3 +220,4 @@
     </script>
 </body>
 </html>
+
