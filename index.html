@@ -6,50 +6,42 @@
     <style>
         body { margin: 0; background: #eee; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: none; border: 4px solid #333; margin: 0 auto; background: #fff; }
-        
-        /* Login Overlay */
         #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; color: white; }
-        .login-box { background: white; padding: 30px; border-radius: 15px; color: #333; display: flex; flex-direction: column; gap: 15px; width: 280px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        .login-box h2 { margin: 0; text-align: center; color: #2c3e50; }
-        .login-box input { padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
-        .login-box button { padding: 12px; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; }
-        .login-box button:hover { background: #2980b9; }
-
-        /* HUD UI */
+        .login-box { background: white; padding: 30px; border-radius: 15px; color: #333; display: flex; flex-direction: column; gap: 15px; width: 280px; }
+        .login-box input { padding: 12px; border: 1px solid #ccc; border-radius: 8px; }
+        .login-box button { padding: 12px; background: #3498db; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .ui-panel { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: white; padding: 8px 15px; border-radius: 25px; z-index: 10; display: none; gap: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); align-items: center; }
         #chat-container { position: absolute; top: 70px; left: 15px; width: 200px; pointer-events: none; z-index: 5; }
         #chat-messages { height: 120px; overflow: hidden; display: flex; flex-direction: column; gap: 5px; }
         .message { background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; width: fit-content; }
-        #chat-input { width: 100%; background: rgba(255,255,255,0.9); border: 2px solid #3498db; padding: 8px; color: #333; visibility: hidden; pointer-events: auto; border-radius: 5px; margin-top: 5px; }
-
-        /* Controls */
+        #chat-input { width: 100%; background: white; border: 2px solid #3498db; padding: 8px; visibility: hidden; pointer-events: auto; border-radius: 5px; }
         #mobile-controls { position: absolute; bottom: 30px; width: 100%; display: none; justify-content: space-between; padding: 0 30px; box-sizing: border-box; pointer-events: none; }
         .joy-base { width: 90px; height: 90px; background: rgba(0,0,0,0.1); border: 3px solid #333; border-radius: 50%; position: relative; pointer-events: auto; }
         #stick { width: 35px; height: 35px; background: #333; border-radius: 50%; position: absolute; left: 27.5px; top: 27.5px; }
         .btn-group { display: flex; flex-direction: column; gap: 15px; pointer-events: auto; }
-        .m-btn { width: 65px; height: 65px; background: #333; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; user-select: none; }
+        .m-btn { width: 65px; height: 65px; background: #333; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="login-overlay">
         <div class="login-box">
-            <h2>Start Playing</h2>
-            <input type="text" id="username" placeholder="Enter Nickname" maxlength="12">
+            <h2>Start Game</h2>
+            <input type="text" id="username" placeholder="Nickname" maxlength="12">
             <button id="start-btn">Login & Spawn</button>
         </div>
     </div>
 
     <div class="ui-panel" id="ui">
         <input type="color" id="colorPicker" value="#3498db">
-        <span id="display-name" style="font-weight:bold; color:#2c3e50;"></span>
+        <span id="display-name" style="font-weight:bold;"></span>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
     <div id="chat-container">
         <div id="chat-messages"></div>
-        <input type="text" id="chat-input" placeholder="Type message..." maxlength="35">
+        <input type="text" id="chat-input" placeholder="Type..." maxlength="35">
     </div>
 
     <div id="mobile-controls">
@@ -62,7 +54,7 @@
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        const SERVER_URL = "https://two-5d-game.onrender.com"; // <-- PUT YOUR URL HERE
+        const SERVER_URL = "https://two-5d-game.onrender.com"; // <-- REPLACE THIS
         
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -75,81 +67,63 @@
         const chatInput = document.getElementById('chat-input');
 
         let socket;
-        let myId = null;
+        let myId = "local"; 
         let players = {};
-        const me = { x: 200, y: 200, z: 0, jv: 0, ground: true, ix: 0, iy: 0, nick: "" };
+        const me = { x: 300, y: 300, z: 0, jv: 0, ground: true, ix: 0, iy: 0, nick: "", color: "#3498db" };
         const keys = {};
 
-        // LOGIN CLICK
+        // 1. START GAME LOOP IMMEDIATELY
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.onresize = resize; resize();
+
         startBtn.onclick = () => {
-            const nick = usernameInput.value.trim() || "Guest" + Math.floor(Math.random()*999);
-            me.nick = nick;
-            
+            me.nick = usernameInput.value.trim() || "Guest";
             loginOverlay.style.display = 'none';
             canvas.style.display = 'block';
             uiPanel.style.display = 'flex';
             mobileControls.style.display = 'flex';
-            document.getElementById('display-name').innerText = nick;
+            document.getElementById('display-name').innerText = me.nick;
             
+            // Start Local Loop
+            requestAnimationFrame(draw);
+            
+            // Connect to Server
             connectToServer();
         };
 
         function connectToServer() {
-            socket = io(SERVER_URL);
-
-            socket.on('init', (data) => {
-                myId = data.id;
-                me.x = data.player.x;
-                me.y = data.player.y;
-                // Immediate spawn update
-                socket.emit('move', { x: me.x, y: me.y, z: me.z, color: colorPicker.value, nick: me.nick });
-            });
-
-            socket.on('updatePlayers', (data) => { players = data; });
-
-            socket.on('newChatMessage', (data) => {
-                const m = document.createElement('div'); m.className = 'message';
-                m.innerHTML = `<b>${data.id}:</b> ${data.text}`;
-                document.getElementById('chat-messages').appendChild(m);
-                setTimeout(() => m.remove(), 6000);
-            });
-
-            resize();
-            requestAnimationFrame(draw);
+            try {
+                socket = io(SERVER_URL);
+                socket.on('init', (data) => { 
+                    myId = data.id; 
+                    socket.emit('move', { x: me.x, y: me.y, z: me.z, color: colorPicker.value, nick: me.nick });
+                });
+                socket.on('updatePlayers', (data) => { players = data; });
+                socket.on('newChatMessage', (data) => {
+                    const m = document.createElement('div'); m.className = 'message';
+                    m.innerHTML = `<b>${data.id}:</b> ${data.text}`;
+                    document.getElementById('chat-messages').appendChild(m);
+                    setTimeout(() => m.remove(), 6000);
+                });
+            } catch(e) { console.log("Server Offline"); }
         }
 
-        function resize() { 
-            canvas.width = window.innerWidth; 
-            canvas.height = window.innerHeight; 
-        }
-        window.onresize = resize;
-
-        // CHAT CONTROLS
+        // --- CONTROLS ---
         function toggleChat() {
             if (chatInput.style.visibility === 'visible') {
-                if (chatInput.value.trim()) socket.emit('chatMessage', chatInput.value.trim());
-                chatInput.value = '';
-                chatInput.style.visibility = 'hidden';
-                chatInput.blur();
-            } else {
-                chatInput.style.visibility = 'visible';
-                chatInput.focus();
-            }
+                if (chatInput.value.trim() && socket) socket.emit('chatMessage', chatInput.value.trim());
+                chatInput.value = ''; chatInput.style.visibility = 'hidden'; chatInput.blur();
+            } else { chatInput.style.visibility = 'visible'; chatInput.focus(); }
         }
-
         window.onkeydown = (e) => {
             if (e.key === '/') { e.preventDefault(); toggleChat(); }
             if (e.key === 'Enter' && document.activeElement === chatInput) toggleChat();
             keys[e.key.toLowerCase()] = true;
         };
         window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
-
         document.getElementById('chat-btn').ontouchstart = (e) => { e.preventDefault(); toggleChat(); };
-        document.getElementById('jump-btn').ontouchstart = (e) => {
-            e.preventDefault(); if (me.ground) { me.jv = 10; me.ground = false; }
-        };
+        document.getElementById('jump-btn').ontouchstart = (e) => { e.preventDefault(); if (me.ground) { me.jv = 10; me.ground = false; } };
 
-        // JOYSTICK
         const jBase = document.getElementById('joyBase');
         const stick = document.getElementById('stick');
         jBase.ontouchstart = jBase.ontouchmove = (e) => {
@@ -166,25 +140,15 @@
         jBase.ontouchend = () => { me.ix = 0; me.iy = 0; stick.style.transform = `translate(0,0)`; };
 
         function update() {
-            if (!myId) return;
             let moved = false;
             let mx = me.ix, my = me.iy;
-
             if (keys['w']) my = -1; if (keys['s']) my = 1;
             if (keys['a']) mx = -1; if (keys['d']) mx = 1;
-
-            if (mx !== 0 || my !== 0) {
-                me.x += mx * 4; me.y += my * 3;
-                moved = true;
-            }
-
-            if (!me.ground) {
-                me.z += me.jv; me.jv -= 0.6;
-                moved = true;
-                if (me.z <= 0) { me.z = 0; me.ground = true; }
-            }
-
-            if (moved || keys['w'] || keys['a'] || keys['s'] || keys['d']) {
+            if (mx !== 0 || my !== 0) { me.x += mx * 4; me.y += my * 3; moved = true; }
+            if (!me.ground) { me.z += me.jv; me.jv -= 0.6; moved = true; if (me.z <= 0) { me.z = 0; me.ground = true; } }
+            
+            // Sync with server if connected
+            if (socket && (moved || keys['w'] || keys['a'] || keys['s'] || keys['d'])) {
                 socket.emit('move', { x: me.x, y: me.y, z: me.z, color: colorPicker.value, nick: me.nick });
             }
         }
@@ -192,40 +156,36 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
+            // Draw My Character Always
+            drawCube(me.x, me.y, me.z, colorPicker.value, me.nick, true);
+
+            // Draw Other Players
             Object.keys(players).forEach(id => {
-                const p = players[id];
-                const dy = p.y - (p.z || 0) - 30;
-
-                // Shadow
-                ctx.fillStyle = "rgba(0,0,0,0.1)";
-                ctx.beginPath(); ctx.ellipse(p.x, p.y, 15, 8, 0, 0, Math.PI*2); ctx.fill();
-
-                // Player
-                ctx.fillStyle = p.color || "#3498db";
-                ctx.fillRect(p.x - 12, dy, 24, 30);
-                if (id === myId) {
-                    ctx.strokeStyle = "#000"; ctx.lineWidth = 2;
-                    ctx.strokeRect(p.x - 12, dy, 24, 30);
-                }
-
-                // Nickname
-                ctx.fillStyle = "black"; ctx.font = "bold 12px Arial"; ctx.textAlign = "center";
-                ctx.fillText(p.nick || "Guest", p.x, dy - 10);
-
-                // Bubble
-                if (p.lastMsg) {
-                    ctx.fillStyle = "white"; ctx.strokeStyle = "black"; ctx.lineWidth = 1;
-                    ctx.fillRect(p.x - 45, dy - 45, 90, 22);
-                    ctx.strokeRect(p.x - 45, dy - 45, 90, 22);
-                    ctx.fillStyle = "black"; ctx.font = "10px Arial";
-                    ctx.fillText(p.lastMsg.substring(0, 15), p.x, dy - 30);
+                if (id !== myId) {
+                    const p = players[id];
+                    drawCube(p.x, p.y, p.z, p.color, p.nick, false, p.lastMsg);
                 }
             });
 
             update();
             requestAnimationFrame(draw);
         }
+
+        function drawCube(x, y, z, color, nick, isMe, msg) {
+            const dy = y - (z || 0) - 30;
+            ctx.fillStyle = "rgba(0,0,0,0.1)";
+            ctx.beginPath(); ctx.ellipse(x, y, 15, 8, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = color || "#3498db";
+            ctx.fillRect(x - 12, dy, 24, 30);
+            if (isMe) { ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.strokeRect(x - 12, dy, 24, 30); }
+            ctx.fillStyle = "black"; ctx.font = "bold 12px Arial"; ctx.textAlign = "center";
+            ctx.fillText(nick || "Guest", x, dy - 10);
+            if (msg) {
+                ctx.fillStyle = "white"; ctx.strokeStyle = "black"; ctx.lineWidth = 1;
+                ctx.fillRect(x - 45, dy - 45, 90, 22); ctx.strokeRect(x - 45, dy - 45, 90, 22);
+                ctx.fillStyle = "black"; ctx.font = "10px Arial"; ctx.fillText(msg.substring(0, 15), x, dy - 30);
+            }
+        }
     </script>
 </body>
 </html>
-
