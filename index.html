@@ -1,6 +1,4 @@
-<!DOCTYPE html>
-<html>
-<head>
+<!DOCTYPE html><html><head>
     <title>Multiplayer Game</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
@@ -16,10 +14,12 @@
         #mobile-controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-between; padding: 0 20px; box-sizing: border-box; pointer-events: none; }
         .joy-base { width: 80px; height: 80px; background: rgba(0,0,0,0.1); border: 2px solid #333; border-radius: 50%; position: relative; pointer-events: auto; }
         #stick { width: 30px; height: 30px; background: #333; border-radius: 50%; position: absolute; left: 25px; top: 25px; }
-        #jump-btn { width: 60px; height: 60px; background: #333; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: auto; }
-    </style>
-</head>
-<body>
+        
+        /* Button Group for Mobile */
+        .btn-group { display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
+        .m-btn { width: 60px; height: 60px; background: #333; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; user-select: none; }
+        #chat-btn { background: #3498db; }
+    </style></head><body>
 
     <div class="ui-panel">
         <input type="color" id="colorPicker" value="#3498db">
@@ -35,7 +35,10 @@
 
     <div id="mobile-controls">
         <div class="joy-base" id="joyBase"><div id="stick"></div></div>
-        <div id="jump-btn">JUMP</div>
+        <div class="btn-group">
+            <div id="chat-btn" class="m-btn">CHAT</div>
+            <div id="jump-btn" class="m-btn">JUMP</div>
+        </div>
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -56,17 +59,44 @@
 
         socket.on('init', (data) => { myId = data.id; me.x = data.player.x; me.y = data.player.y; });
 
-        // Inputs
+        // --- CHAT LOGIC ---
+        const chatInput = document.getElementById('chat-input');
+        
+        function openChat() {
+            chatInput.style.visibility = 'visible';
+            chatInput.focus();
+        }
+
+        function closeChat() {
+            if (chatInput.value.trim()) socket.emit('chatMessage', chatInput.value.trim());
+            chatInput.value = '';
+            chatInput.blur();
+            chatInput.style.visibility = 'hidden';
+        }
+
+        // Keyboard Inputs
         const keys = {};
         window.onkeydown = (e) => {
-            if (e.key === '/') { e.preventDefault(); document.getElementById('chat-input').style.visibility='visible'; document.getElementById('chat-input').focus(); }
-            if (e.key === 'Enter' && document.activeElement.id === 'chat-input') {
-                if (e.target.value.trim()) socket.emit('chatMessage', e.target.value.trim());
-                e.target.value = ''; e.target.blur(); e.target.style.visibility = 'hidden';
-            }
+            if (e.key === '/') { e.preventDefault(); openChat(); }
+            if (e.key === 'Enter' && document.activeElement === chatInput) { closeChat(); }
             keys[e.key.toLowerCase()] = true;
         };
         window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
+
+        // --- MOBILE BUTTONS ---
+        document.getElementById('chat-btn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (chatInput.style.visibility === 'visible') {
+                closeChat();
+            } else {
+                openChat();
+            }
+        });
+
+        document.getElementById('jump-btn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (me.isGrounded) { me.jumpVel = 10; me.isGrounded = false; }
+        });
 
         // Joystick Logic
         const jBase = document.getElementById('joyBase');
@@ -88,10 +118,6 @@
             }
         }
 
-        document.getElementById('jump-btn').addEventListener('touchstart', (e) => {
-            if (me.isGrounded) { me.jumpVel = 10; me.isGrounded = false; }
-        });
-
         function update() {
             if (!myId) return;
             let moved = false;
@@ -106,7 +132,6 @@
                 moved = true;
             }
 
-            // Screen Borders
             me.x = Math.max(20, Math.min(canvas.width-20, me.x));
             me.y = Math.max(20, Math.min(canvas.height-20, me.y));
 
@@ -150,6 +175,4 @@
         });
 
         draw();
-    </script>
-</body>
-</html>
+    </script></body></html>
