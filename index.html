@@ -1,21 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Cube World: Battle Edition</title>
+    <title>Super Cube World: Birthday Edition</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <style>
-        /* ... (Existing CSS remains the same) ... */
         body { margin: 0; background: #222; font-family: 'Segoe UI', sans-serif; overflow: hidden; touch-action: none; position: fixed; width: 100%; height: 100%; }
         canvas { display: none; border: 6px solid #333; margin: 0 auto; background: #567d46; cursor: crosshair; }
+        
         #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 100; }
-        .login-box { background: white; padding: 30px; border-radius: 20px; display: flex; flex-direction: column; gap: 15px; width: 280px; text-align: center; }
+        .login-box { background: white; padding: 30px; border-radius: 20px; display: flex; flex-direction: column; gap: 15px; width: 280px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .login-box input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; outline: none; }
         .login-box button { padding: 12px; background: #e67e22; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .ui-panel { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.9); padding: 8px 15px; border-radius: 25px; z-index: 10; display: none; gap: 10px; align-items: center; }
-        #leaderboard { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 12px; border-radius: 12px; font-size: 12px; min-width: 110px; display: none; }
+        
+        .ui-panel { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.9); padding: 8px 15px; border-radius: 25px; z-index: 10; display: none; gap: 10px; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        #leaderboard { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 12px; border-radius: 12px; font-size: 12px; min-width: 110px; display: none; backdrop-filter: blur(5px); }
+        
         #chat-container { position: absolute; bottom: 120px; left: 20px; width: 240px; pointer-events: none; z-index: 50; }
-        #chat-messages { height: 100px; overflow: hidden; display: flex; flex-direction: column-reverse; gap: 5px; }
-        .message { background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 6px; font-size: 12px; }
-        #chat-input { width: 100%; background: white; border: 3px solid #3498db; padding: 12px; visibility: hidden; pointer-events: auto; border-radius: 10px; outline: none; }
+        #chat-messages { height: 130px; overflow: hidden; display: flex; flex-direction: column-reverse; gap: 5px; margin-bottom: 10px; }
+        .message { background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 6px; font-size: 12px; width: fit-content; }
+        #chat-input { width: 100%; background: white; border: 3px solid #3498db; padding: 12px; visibility: hidden; pointer-events: auto; border-radius: 10px; outline: none; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        
         #mobile-controls { position: absolute; bottom: 30px; width: 100%; display: none; justify-content: space-between; padding: 0 30px; box-sizing: border-box; pointer-events: none; }
         .joy-base { width: 90px; height: 90px; background: rgba(255,255,255,0.2); border: 3px solid white; border-radius: 50%; position: relative; pointer-events: auto; }
         #stick { width: 35px; height: 35px; background: white; border-radius: 50%; position: absolute; left: 27.5px; top: 27.5px; }
@@ -26,24 +30,32 @@
 
     <div id="login-overlay">
         <div class="login-box">
-            <h1>CUBE WORLD</h1>
+            <h1 style="margin:0; color:#333">CUBE WORLD</h1>
+            <div id="event-banner" style="display:none; color:#e67e22; font-weight:bold; font-size:12px;">🎉 SPECIAL EVENT: BIRTHDAY HATS ACTIVE! 🎉</div>
             <input type="text" id="username" placeholder="Nickname" maxlength="10">
             <button id="start-btn">PLAY NOW</button>
-            <p style="font-size:10px; color:#666">WASD to Move | Shift to Dash | E to Attack</p>
+            <p style="font-size:10px; color:#666">WASD + Shift to Dash | / to Chat</p>
         </div>
     </div>
 
     <div id="leaderboard"><b>Top Players</b><hr><div id="scores"></div></div>
-    <div class="ui-panel" id="ui"><input type="color" id="colorPicker" value="#3498db"><span id="display-name"></span></div>
+    <div class="ui-panel" id="ui">
+        <input type="color" id="colorPicker" value="#3498db">
+        <span id="display-name" style="font-weight:bold; color:#333"></span>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
-    <div id="chat-container"><div id="chat-messages"></div><input type="text" id="chat-input" placeholder="Type..." maxlength="35"></div>
+
+    <div id="chat-container">
+        <div id="chat-messages"></div>
+        <input type="text" id="chat-input" placeholder="Type a message..." maxlength="35">
+    </div>
 
     <div id="mobile-controls">
         <div class="joy-base" id="joyBase"><div id="stick"></div></div>
         <div style="display:flex; gap:10px; align-items: flex-end;">
             <div id="chat-btn" class="m-btn">CHAT</div>
             <div style="display:flex; flex-direction:column; gap:10px;">
-                <div id="attack-btn" class="m-btn" style="background:#c0392b; border:none;">ATTACK</div>
                 <div id="dash-btn" class="m-btn" style="background:#3498db; border:none;">DASH</div>
                 <div id="jump-btn" class="m-btn" style="background:#e67e22; border:none;">JUMP</div>
             </div>
@@ -58,26 +70,62 @@
         const chatInput = document.getElementById('chat-input');
         
         let socket, myId = null;
-        let players = {}, enemies = [], coin = {x:0, y:0}, trails = [];
-        const me = { x: 300, y: 300, z: 0, jv: 0, ground: true, ix: 0, iy: 0, nick: "", score: 0, dashTimer: 0, attackVisual: 0 };
+        let players = {}, coin = {x:0, y:0}, trails = [];
+        const me = { x: 300, y: 300, z: 0, jv: 0, ground: true, ix: 0, iy: 0, nick: "", score: 0, dashTimer: 0 };
         const keys = {};
         let isSpecialDay = false;
 
-        // Birthday Logic
-        const now = new Date();
-        isSpecialDay = (now.getDate() === 21 && now.getMonth() === 1) || (now.getDate() === 20 && now.getMonth() === 7) || (now.getDate() === 23 && now.getMonth() === 8);
+        // --- BIRTHDAY LOGIC ---
+        function checkSpecialDay() {
+            const now = new Date();
+            const day = now.getDate();
+            const month = now.getMonth() + 1; // JS months are 0-11
+            const specialDates = [
+                {d: 21, m: 2}, // Feb 21
+                {d: 20, m: 8}, // Aug 20
+                {d: 23, m: 9}  // Sep 23
+            ];
+            isSpecialDay = specialDates.some(date => date.d === day && date.m === month);
+            if(isSpecialDay) document.getElementById('event-banner').style.display = 'block';
+        }
+        checkSpecialDay();
 
-        // Sound Engine
+        // Audio Engine
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playSound(type) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.connect(gain); gain.connect(audioCtx.destination);
-            if(type==='jump'){ osc.frequency.setValueAtTime(150,0); osc.frequency.linearRampToValueAtTime(400,0.1); gain.gain.fadeOut=0.2; }
-            if(type==='attack'){ osc.type='sawtooth'; osc.frequency.setValueAtTime(200,0); osc.frequency.linearRampToValueAtTime(50,0.1); }
-            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+            if (type === 'jump') {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+            } else if (type === 'coin') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'dash') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+            }
         }
+
+        const decos = [];
+        for(let i=0; i<20; i++) decos.push({ x: Math.random()*2000, y: Math.random()*2000, type: Math.random() > 0.6 ? 'tree' : 'flower' });
+        const obstacles = [{x: 200, y: 200, w: 100, h: 40}, {x: 600, y: 300, w: 80, h: 80}];
+        const lavaZones = [{x: 400, y: 100, w: 200, h: 60}];
+        const speedPads = [{x: 100, y: 500, w: 50, h: 50}];
+
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.onresize = resize; resize();
 
         document.getElementById('start-btn').onclick = () => {
             me.nick = document.getElementById('username').value.trim() || "Cube";
@@ -87,6 +135,7 @@
             document.getElementById('leaderboard').style.display = 'block';
             document.getElementById('mobile-controls').style.display = 'flex';
             document.getElementById('display-name').innerText = me.nick;
+            audioCtx.resume();
             connectToServer();
             requestAnimationFrame(draw);
         };
@@ -94,97 +143,94 @@
         function connectToServer() {
             socket = io(SERVER_URL);
             socket.on('init', (data) => { myId = data.id; coin = data.coin; });
-            socket.on('updatePlayers', (data) => { players = data; });
-            socket.on('enemyUpdate', (data) => { enemies = data; });
+            socket.on('updatePlayers', (data) => { 
+                const oldScore = players[myId]?.score || 0;
+                players = data; 
+                if (players[myId]?.score > oldScore) playSound('coin');
+                const list = Object.values(players).sort((a,b) => b.score - a.score).slice(0,5);
+                document.getElementById('scores').innerHTML = list.map(p => `<div>${p.nick}: <b>${p.score}</b></div>`).join('');
+            });
             socket.on('coinUpdate', (c) => { coin = c; });
-        }
-
-        // ATTACK LOGIC
-        function performAttack() {
-            me.attackVisual = 10; // Frames to show the blast ring
-            playSound('attack');
-            enemies.forEach(en => {
-                let dx = en.x - me.x, dy = en.y - me.y;
-                let dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < 80) { // Attack Range
-                    socket.emit('destroyEnemy', en.id);
-                }
+            socket.on('newChatMessage', (data) => {
+                const m = document.createElement('div'); m.className = 'message';
+                m.innerHTML = `<b>${data.id}:</b> ${data.text}`;
+                document.getElementById('chat-messages').prepend(m);
+                setTimeout(() => m.remove(), 6000);
             });
         }
 
+        function toggleChat(forceOpen = false) {
+            if (forceOpen) { chatInput.style.visibility = 'visible'; chatInput.focus(); return; }
+            if (chatInput.style.visibility === 'visible') {
+                if (chatInput.value.trim() && socket) socket.emit('chatMessage', chatInput.value.trim());
+                chatInput.value = ''; chatInput.style.visibility = 'hidden'; chatInput.blur();
+            } else { chatInput.style.visibility = 'visible'; chatInput.focus(); }
+        }
+
+        function triggerDash() { if (me.dashTimer <= 0) { me.dashTimer = 20; playSound('dash'); } }
+
         window.onkeydown = (e) => { 
             if(e.key === ' ' && me.ground && document.activeElement !== chatInput) { me.jv = 11; me.ground = false; playSound('jump'); }
-            if(e.key === 'Shift') me.dashTimer = 20;
-            if(e.key.toLowerCase() === 'e') performAttack();
+            if(e.key === 'Shift' && document.activeElement !== chatInput) triggerDash();
             if(e.key === 'Enter') toggleChat();
             if(e.key === '/') { if(document.activeElement !== chatInput) { e.preventDefault(); toggleChat(true); } }
             keys[e.key.toLowerCase()] = true; 
         };
         window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
 
-        document.getElementById('attack-btn').ontouchstart = (e) => { e.preventDefault(); performAttack(); };
-        document.getElementById('jump-btn').ontouchstart = (e) => { e.preventDefault(); if(me.ground){me.jv=11; me.ground=false; playSound('jump');}};
-        document.getElementById('dash-btn').ontouchstart = (e) => { e.preventDefault(); me.dashTimer = 20; };
-        
-        // Joystick (simplified)
+        document.getElementById('chat-btn').ontouchstart = (e) => { e.preventDefault(); toggleChat(); };
+        document.getElementById('jump-btn').ontouchstart = (e) => { e.preventDefault(); if(me.ground) { me.jv=11; me.ground=false; playSound('jump'); }};
+        document.getElementById('dash-btn').ontouchstart = (e) => { e.preventDefault(); triggerDash(); };
+
         const jBase = document.getElementById('joyBase'), stick = document.getElementById('stick');
-        jBase.ontouchmove = (e) => {
+        jBase.ontouchstart = jBase.ontouchmove = (e) => {
+            e.preventDefault();
             const r = jBase.getBoundingClientRect();
             const dx = e.touches[0].clientX - (r.left + 45), dy = e.touches[0].clientY - (r.top + 45);
             const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 35), ang = Math.atan2(dy, dx);
-            me.ix = Math.cos(ang) * (dist/35); me.iy = Math.sin(ang) * (dist/35);
+            me.ix = (Math.cos(ang) * dist) / 35; me.iy = (Math.sin(ang) * dist) / 35;
             stick.style.transform = `translate(${Math.cos(ang)*dist}px, ${Math.sin(ang)*dist}px)`;
         };
         jBase.ontouchend = () => { me.ix = me.iy = 0; stick.style.transform = `translate(0,0)`; };
 
         function update() {
-            let speed = (me.dashTimer > 0) ? 10 : 4.5;
-            if(me.dashTimer > 0) me.dashTimer--;
-            if(me.attackVisual > 0) me.attackVisual--;
-
-            if(document.activeElement !== chatInput){
-                if(keys['w']) me.iy = -1; else if(keys['s']) me.iy = 1; else if(!me.ix) me.iy = 0;
-                if(keys['a']) me.ix = -1; else if(keys['d']) me.ix = 1; else if(!me.iy) me.ix = 0;
+            let speed = (me.dashTimer > 0) ? 12 : 4.5;
+            if (me.dashTimer > 0) me.dashTimer--;
+            let mx = me.ix, my = me.iy;
+            if(document.activeElement !== chatInput) {
+                if(keys['w']) my = -1; if(keys['s']) my = 1; if(keys['a']) mx = -1; if(keys['d']) mx = 1;
             }
-
-            me.x += me.ix * speed; me.y += me.iy * (speed*0.75);
-            if(!me.ground) { me.z += me.jv; me.jv -= 0.6; if(me.z <= 0) { me.z = 0; me.ground = true; }}
-
-            // Enemy Logic (Local visual prediction)
-            enemies.forEach(en => {
-                let dx = me.x - en.x, dy = me.y - en.y;
-                let dist = Math.sqrt(dx*dx + dy*dy);
-                if(dist < 20 && me.z < 10) { me.x = 300; me.y = 300; } // Death reset
-                en.x += (dx/dist) * en.speed; en.y += (dy/dist) * en.speed;
-            });
-
+            speedPads.forEach(s => { if(me.x > s.x && me.x < s.x+s.w && me.y > s.y && me.y < s.y+s.h) speed *= 1.5; });
+            let nx = me.x + mx * speed, ny = me.y + my * (speed*0.75);
+            let hit = false;
+            obstacles.forEach(o => { if(nx > o.x && nx < o.x+o.w && ny > o.y && ny < o.y+o.h && me.z < 20) hit = true; });
+            if(!hit) { me.x = nx; me.y = ny; }
+            lavaZones.forEach(l => { if(me.x > l.x && me.x < l.x+l.w && me.y > l.y && me.y < l.y+l.h && me.ground) { me.x = 300; me.y = 300; }});
+            if(!me.ground) { me.z += me.jv; me.jv -= 0.6; if(me.z <= 0) { me.z = 0; me.jv = 0; me.ground = true; }}
+            me.x = Math.max(20, Math.min(canvas.width-20, me.x));
+            me.y = Math.max(20, Math.min(canvas.height-20, me.y));
             if(socket?.connected) socket.emit('move', { x: me.x, y: me.y, z: me.z, color: colorPicker.value, nick: me.nick });
+            if(Math.abs(mx) > 0.1 || Math.abs(my) > 0.1 || me.dashTimer > 0) trails.push({x: me.x, y: me.y - me.z, a: 1.0, dash: me.dashTimer > 0});
+            if(trails.length > 20) trails.shift();
         }
 
         function draw() {
             ctx.fillStyle = "#567d46"; ctx.fillRect(0,0,canvas.width, canvas.height);
-            
-            // Draw Coin
+            ctx.fillStyle = "#f1c40f"; speedPads.forEach(s => ctx.fillRect(s.x, s.y, s.w, s.h));
+            ctx.fillStyle = "#e74c3c"; lavaZones.forEach(l => ctx.fillRect(l.x, l.y, l.w, l.h));
+            ctx.fillStyle = "#2c3e50"; obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
+            decos.forEach(d => {
+                if(d.type === 'tree') {
+                    ctx.fillStyle = "#3e2723"; ctx.fillRect(d.x-3, d.y-15, 6, 15);
+                    ctx.fillStyle = "#2e7d32"; ctx.beginPath(); ctx.arc(d.x, d.y-18, 12, 0, 7); ctx.fill();
+                } else { ctx.fillStyle = "#f1c40f"; ctx.beginPath(); ctx.arc(d.x, d.y, 2, 0, 7); ctx.fill(); }
+            });
             ctx.fillStyle = "#f1c40f"; ctx.beginPath(); ctx.arc(coin.x, coin.y, 10, 0, 7); ctx.fill();
+            ctx.strokeStyle = "white"; ctx.stroke();
+            trails.forEach(t => { t.a -= 0.05; ctx.fillStyle = t.dash ? `rgba(52, 152, 219, ${t.a})` : `rgba(255,255,255,${t.a})`; ctx.fillRect(t.x-2, t.y+10, t.dash?6:4, t.dash?6:4); });
 
-            // Draw Enemies
-            enemies.forEach(en => {
-                ctx.fillStyle = "#c0392b";
-                ctx.beginPath(); ctx.moveTo(en.x, en.y-15); ctx.lineTo(en.x+10, en.y+5); ctx.lineTo(en.x-10, en.y+5); ctx.fill();
-            });
-
-            // Draw Attack Visual
-            if(me.attackVisual > 0) {
-                ctx.strokeStyle = `rgba(255,255,255,${me.attackVisual/10})`;
-                ctx.lineWidth = 5;
-                ctx.beginPath(); ctx.arc(me.x, me.y, 80 - me.attackVisual*4, 0, 7); ctx.stroke();
-            }
-
-            // Draw Players
-            Object.keys(players).forEach(id => {
-                const p = players[id];
-                drawCube(p.x, p.y, p.z, p.color, p.nick, id === myId, p.lastMsg);
-            });
+            Object.keys(players).forEach(id => { if(id !== myId) { const p = players[id]; drawCube(p.x, p.y, p.z, p.color, p.nick, false, p.lastMsg); }});
+            drawCube(me.x, me.y, me.z, colorPicker.value, me.nick, true, players[myId]?.lastMsg || "");
 
             update();
             requestAnimationFrame(draw);
@@ -192,21 +238,27 @@
 
         function drawCube(x, y, z, color, nick, isMe, msg) {
             const dy = y - (z || 0) - 30;
-            if(isSpecialDay){
-                ctx.fillStyle = "#e67e22"; ctx.beginPath(); ctx.moveTo(x-12, dy); ctx.lineTo(x, dy-20); ctx.lineTo(x+12, dy); ctx.fill();
+            ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.beginPath(); ctx.ellipse(x, y, 15, 8, 0, 0, 7); ctx.fill();
+            
+            // Birthday Hat
+            if(isSpecialDay) {
+                ctx.fillStyle = "#e67e22"; // Orange hat
+                ctx.beginPath();
+                ctx.moveTo(x - 12, dy);
+                ctx.lineTo(x, dy - 20);
+                ctx.lineTo(x + 12, dy);
+                ctx.fill();
+                ctx.fillStyle = "white"; // Pom-pom
+                ctx.beginPath(); ctx.arc(x, dy - 22, 4, 0, 7); ctx.fill();
             }
+
             ctx.fillStyle = color; ctx.fillRect(x-12, dy, 24, 30);
+            if(isMe) { ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.strokeRect(x-12, dy, 24, 30); }
             ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
             ctx.fillText(nick, x, dy-12);
-            if(msg){ ctx.fillStyle="white"; ctx.fillRect(x-40, dy-45, 80, 20); ctx.fillStyle="black"; ctx.fillText(msg, x, dy-32); }
-        }
-
-        function toggleChat(forceOpen = false) {
-            if(forceOpen || chatInput.style.visibility !== 'visible'){
-                chatInput.style.visibility = 'visible'; chatInput.focus();
-            } else {
-                if(chatInput.value.trim()) socket.emit('chatMessage', chatInput.value.trim());
-                chatInput.value = ''; chatInput.style.visibility = 'hidden'; chatInput.blur();
+            if(msg) {
+                ctx.fillStyle = "white"; ctx.fillRect(x-45, dy-50, 90, 22);
+                ctx.fillStyle = "black"; ctx.font = "10px sans-serif"; ctx.fillText(msg.substring(0,15), x, dy-35);
             }
         }
     </script>
