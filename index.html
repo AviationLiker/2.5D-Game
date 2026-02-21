@@ -60,7 +60,7 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const chatInput = document.getElementById('chat-input');
-        let socket, myId = "local";
+        let socket, myId = null;
         let players = {}, coin = {x:0, y:0}, trails = [];
         const me = { x: 300, y: 300, z: 0, jv: 0, ground: true, ix: 0, iy: 0, nick: "", score: 0 };
         const keys = {};
@@ -87,16 +87,19 @@
             document.getElementById('mobile-controls').style.display = 'flex';
             document.getElementById('display-name').innerText = me.nick;
             
-            // Fullscreen attempt
             try { document.documentElement.requestFullscreen(); } catch(e){}
-
-            requestAnimationFrame(draw);
             connectToServer();
+            requestAnimationFrame(draw);
         };
 
         function connectToServer() {
             socket = io(SERVER_URL);
-            socket.on('init', (data) => { myId = data.id; coin = data.coin; });
+            socket.on('init', (data) => { 
+                myId = data.id; 
+                coin = data.coin; 
+                // Send initial position
+                socket.emit('move', { x: me.x, y: me.y, z: me.z, color: document.getElementById('colorPicker').value, nick: me.nick });
+            });
             socket.on('updatePlayers', (data) => { 
                 players = data; 
                 const list = Object.values(players).sort((a,b) => b.score - a.score).slice(0,5);
@@ -111,38 +114,21 @@
             });
         }
 
-        // --- CHAT LOGIC ---
         function toggleChat() {
             if (chatInput.style.visibility === 'visible') {
-                if (chatInput.value.trim() && socket) {
-                    socket.emit('chatMessage', chatInput.value.trim());
-                }
-                chatInput.value = '';
-                chatInput.style.visibility = 'hidden';
-                chatInput.blur();
-            } else {
-                chatInput.style.visibility = 'visible';
-                chatInput.focus();
-            }
+                if (chatInput.value.trim() && socket) socket.emit('chatMessage', chatInput.value.trim());
+                chatInput.value = ''; chatInput.style.visibility = 'hidden'; chatInput.blur();
+            } else { chatInput.style.visibility = 'visible'; chatInput.focus(); }
         }
 
-        document.getElementById('chat-btn').ontouchstart = (e) => {
-            e.preventDefault();
-            toggleChat();
-        };
-
+        document.getElementById('chat-btn').ontouchstart = (e) => { e.preventDefault(); toggleChat(); };
         window.onkeydown = (e) => { 
             if(e.key === ' ' && me.ground) { me.jv = 10; me.ground = false; }
             if(e.key === 'Enter') toggleChat();
-            if(e.key === '/') { e.preventDefault(); if(chatInput.style.visibility !== 'visible') toggleChat(); }
             keys[e.key.toLowerCase()] = true; 
         };
         window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
-
-        document.getElementById('jump-btn').ontouchstart = (e) => { 
-            e.preventDefault(); 
-            if(me.ground) { me.jv=10; me.ground=false; }
-        };
+        document.getElementById('jump-btn').ontouchstart = (e) => { e.preventDefault(); if(me.ground) { me.jv=10; me.ground=false; }};
 
         // Joystick
         const jBase = document.getElementById('joyBase'), stick = document.getElementById('stick');
@@ -158,12 +144,12 @@
         jBase.ontouchend = () => { me.ix = me.iy = 0; stick.style.transform = `translate(0,0)`; };
 
         function update() {
-            let speed = 4;
+            let speed = 4.5;
             let mx = me.ix, my = me.iy;
             if(keys['w']) my = -1; if(keys['s']) my = 1; if(keys['a']) mx = -1; if(keys['d']) mx = 1;
 
             speedPads.forEach(s => {
-                if(me.x > s.x && me.x < s.x+s.w && me.y > s.y && me.y < s.y+s.h) speed = 8;
+                if(me.x > s.x && me.x < s.x+s.w && me.y > s.y && me.y < s.y+s.h) speed = 9;
             });
 
             let nx = me.x + mx * speed, ny = me.y + my * (speed*0.75);
@@ -175,9 +161,7 @@
             if(!hit) { me.x = nx; me.y = ny; }
 
             lavaZones.forEach(l => {
-                if(me.x > l.x && me.x < l.x+l.w && me.y > l.y && me.y < l.y+l.h && me.ground) {
-                    me.x = 300; me.y = 300;
-                }
+                if(me.x > l.x && me.x < l.x+l.w && me.y > l.y && me.y < l.y+l.h && me.ground) { me.x = 300; me.y = 300; }
             });
 
             if(!me.ground) {
@@ -188,7 +172,10 @@
             me.x = Math.max(20, Math.min(canvas.width-20, me.x));
             me.y = Math.max(20, Math.min(canvas.height-20, me.y));
 
-            if(socket) socket.emit('move', { x: me.x, y: me.y, z: me.z, color: document.getElementById('colorPicker').value, nick: me.nick });
+            // Sync move to server
+            if(socket && socket.connected) {
+                socket.emit('move', { x: me.x, y: me.y, z: me.z, color: document.getElementById('colorPicker').value, nick: me.nick });
+            }
             
             if(Math.abs(mx) > 0.1 || Math.abs(my) > 0.1) trails.push({x: me.x, y: me.y - me.z, a: 1.0});
             if(trails.length > 15) trails.shift();
@@ -201,7 +188,7 @@
             ctx.fillStyle = "#e74c3c"; lavaZones.forEach(l => ctx.fillRect(l.x, l.y, l.w, l.h));
             ctx.fillStyle = "#2c3e50"; obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
 
-            // Decor
+            // Decorations
             decos.forEach(d => {
                 if(d.type === 'tree') {
                     ctx.fillStyle = "#3e2723"; ctx.fillRect(d.x-3, d.y-15, 6, 15);
@@ -218,12 +205,17 @@
             // Trails
             trails.forEach(t => { t.a -= 0.05; ctx.fillStyle = `rgba(255,255,255,${t.a})`; ctx.fillRect(t.x-2, t.y+10, 4, 4); });
 
-            // Players
+            // DRAW OTHERS
             Object.keys(players).forEach(id => {
-                const p = players[id];
-                drawCube(p.x, p.y, p.z, p.color, p.nick, id === myId, p.lastMsg);
+                if(id !== myId) {
+                    const p = players[id];
+                    drawCube(p.x, p.y, p.z, p.color, p.nick, false, p.lastMsg);
+                }
             });
-            if(!players[myId]) drawCube(me.x, me.y, me.z, colorPicker.value, me.nick, true);
+
+            // DRAW LOCAL PLAYER (Always uses "me" variables for instant response)
+            const myLastMsg = players[myId] ? players[myId].lastMsg : "";
+            drawCube(me.x, me.y, me.z, document.getElementById('colorPicker').value, me.nick, true, myLastMsg);
 
             update();
             requestAnimationFrame(draw);
@@ -241,4 +233,6 @@
                 ctx.fillStyle = "black"; ctx.font = "10px Arial"; ctx.fillText(msg.substring(0,15), x, dy-30);
             }
         }
-    </script></body></html>
+    </script>
+   </body></html>
+
