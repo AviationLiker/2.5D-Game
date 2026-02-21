@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Super Cube World</title>
+    <title>Super Cube World: Dash & Sound</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <style>
         body { margin: 0; background: #222; font-family: 'Segoe UI', sans-serif; overflow: hidden; touch-action: none; position: fixed; width: 100%; height: 100%; }
@@ -23,7 +23,7 @@
         #mobile-controls { position: absolute; bottom: 30px; width: 100%; display: none; justify-content: space-between; padding: 0 30px; box-sizing: border-box; pointer-events: none; }
         .joy-base { width: 90px; height: 90px; background: rgba(255,255,255,0.2); border: 3px solid white; border-radius: 50%; position: relative; pointer-events: auto; }
         #stick { width: 35px; height: 35px; background: white; border-radius: 50%; position: absolute; left: 27.5px; top: 27.5px; }
-        .m-btn { width: 65px; height: 65px; background: rgba(0,0,0,0.4); border: 2px solid white; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: auto; user-select: none; }
+        .m-btn { width: 60px; height: 60px; background: rgba(0,0,0,0.4); border: 2px solid white; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: auto; user-select: none; font-size: 10px; }
     </style>
 </head>
 <body>
@@ -33,7 +33,7 @@
             <h1 style="margin:0; color:#333">CUBE WORLD</h1>
             <input type="text" id="username" placeholder="Nickname" maxlength="10">
             <button id="start-btn">PLAY NOW</button>
-            <p style="font-size:10px; color:#666">Controls: WASD to move, Space to Jump<br>/ to Chat, Enter to Send</p>
+            <p style="font-size:10px; color:#666">Controls: WASD + Shift to Dash<br>/ to Chat, Enter to Send</p>
         </div>
     </div>
 
@@ -53,38 +53,65 @@
 
     <div id="mobile-controls">
         <div class="joy-base" id="joyBase"><div id="stick"></div></div>
-        <div style="display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; gap:10px; align-items: flex-end;">
             <div id="chat-btn" class="m-btn">CHAT</div>
-            <div id="jump-btn" class="m-btn" style="background:#e67e22; border:none;">JUMP</div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <div id="dash-btn" class="m-btn" style="background:#3498db; border:none;">DASH</div>
+                <div id="jump-btn" class="m-btn" style="background:#e67e22; border:none;">JUMP</div>
+            </div>
         </div>
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        const SERVER_URL = "https://two-5d-game.onrender.com"; // <-- Update this!
+        const SERVER_URL = "https://two-5d-game.onrender.com"; 
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const chatInput = document.getElementById('chat-input');
         
         let socket, myId = null;
         let players = {}, coin = {x:0, y:0}, trails = [];
-        const me = { x: 300, y: 300, z: 0, jv: 0, ground: true, ix: 0, iy: 0, nick: "", score: 0 };
+        const me = { x: 300, y: 300, z: 0, jv: 0, ground: true, ix: 0, iy: 0, nick: "", score: 0, dashTimer: 0 };
         const keys = {};
 
-        // Environment Decor
+        // Audio Context for Procedural Sounds
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            
+            if (type === 'jump') {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+            } else if (type === 'coin') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'dash') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+            }
+        }
+
         const decos = [];
         for(let i=0; i<20; i++) {
             decos.push({ x: Math.random()*2000, y: Math.random()*2000, type: Math.random() > 0.6 ? 'tree' : 'flower' });
         }
-
         const obstacles = [{x: 200, y: 200, w: 100, h: 40}, {x: 600, y: 300, w: 80, h: 80}];
         const lavaZones = [{x: 400, y: 100, w: 200, h: 60}];
         const speedPads = [{x: 100, y: 500, w: 50, h: 50}];
 
-        function resize() { 
-            canvas.width = window.innerWidth; 
-            canvas.height = window.innerHeight; 
-        }
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.onresize = resize; resize();
 
         document.getElementById('start-btn').onclick = () => {
@@ -95,8 +122,7 @@
             document.getElementById('leaderboard').style.display = 'block';
             document.getElementById('mobile-controls').style.display = 'flex';
             document.getElementById('display-name').innerText = me.nick;
-            
-            try { document.documentElement.requestFullscreen(); } catch(e){}
+            audioCtx.resume();
             connectToServer();
             requestAnimationFrame(draw);
         };
@@ -104,12 +130,13 @@
         function connectToServer() {
             socket = io(SERVER_URL);
             socket.on('init', (data) => { 
-                myId = data.id; 
-                coin = data.coin; 
+                myId = data.id; coin = data.coin; 
                 socket.emit('move', { x: me.x, y: me.y, z: me.z, color: colorPicker.value, nick: me.nick });
             });
             socket.on('updatePlayers', (data) => { 
+                const oldScore = players[myId]?.score || 0;
                 players = data; 
+                if (players[myId]?.score > oldScore) playSound('coin');
                 const list = Object.values(players).sort((a,b) => b.score - a.score).slice(0,5);
                 document.getElementById('scores').innerHTML = list.map(p => `<div>${p.nick}: <b>${p.score}</b></div>`).join('');
             });
@@ -122,44 +149,36 @@
             });
         }
 
-        // --- IMPROVED CHAT LOGIC ---
         function toggleChat(forceOpen = false) {
-            if (forceOpen) {
-                chatInput.style.visibility = 'visible';
-                chatInput.focus();
-                return;
-            }
+            if (forceOpen) { chatInput.style.visibility = 'visible'; chatInput.focus(); return; }
             if (chatInput.style.visibility === 'visible') {
                 if (chatInput.value.trim() && socket) socket.emit('chatMessage', chatInput.value.trim());
-                chatInput.value = '';
-                chatInput.style.visibility = 'hidden';
-                chatInput.blur();
-            } else {
-                chatInput.style.visibility = 'visible';
-                chatInput.focus();
+                chatInput.value = ''; chatInput.style.visibility = 'hidden'; chatInput.blur();
+            } else { chatInput.style.visibility = 'visible'; chatInput.focus(); }
+        }
+
+        function triggerDash() {
+            if (me.dashTimer <= 0) {
+                me.dashTimer = 20; // 20 frames of high speed
+                playSound('dash');
             }
         }
 
-        // --- CONTROLS ---
         window.onkeydown = (e) => { 
             if(e.key === ' ' && me.ground && document.activeElement !== chatInput) { 
-                me.jv = 11; me.ground = false; 
+                me.jv = 11; me.ground = false; playSound('jump');
             }
+            if(e.key === 'Shift' && document.activeElement !== chatInput) triggerDash();
             if(e.key === 'Enter') toggleChat();
-            if(e.key === '/') { 
-                if(document.activeElement !== chatInput) {
-                    e.preventDefault(); 
-                    toggleChat(true); 
-                }
-            }
+            if(e.key === '/') { if(document.activeElement !== chatInput) { e.preventDefault(); toggleChat(true); } }
             keys[e.key.toLowerCase()] = true; 
         };
         window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
 
         document.getElementById('chat-btn').ontouchstart = (e) => { e.preventDefault(); toggleChat(); };
-        document.getElementById('jump-btn').ontouchstart = (e) => { e.preventDefault(); if(me.ground) { me.jv=11; me.ground=false; }};
+        document.getElementById('jump-btn').ontouchstart = (e) => { e.preventDefault(); if(me.ground) { me.jv=11; me.ground=false; playSound('jump'); }};
+        document.getElementById('dash-btn').ontouchstart = (e) => { e.preventDefault(); triggerDash(); };
 
-        // Joystick
         const jBase = document.getElementById('joyBase'), stick = document.getElementById('stick');
         jBase.ontouchstart = jBase.ontouchmove = (e) => {
             e.preventDefault();
@@ -172,27 +191,24 @@
         jBase.ontouchend = () => { me.ix = me.iy = 0; stick.style.transform = `translate(0,0)`; };
 
         function update() {
-            let speed = 4.5;
+            let speed = (me.dashTimer > 0) ? 12 : 4.5;
+            if (me.dashTimer > 0) me.dashTimer--;
+
             let mx = me.ix, my = me.iy;
             if(document.activeElement !== chatInput) {
                 if(keys['w']) my = -1; if(keys['s']) my = 1; if(keys['a']) mx = -1; if(keys['d']) mx = 1;
             }
 
             speedPads.forEach(s => {
-                if(me.x > s.x && me.x < s.x+s.w && me.y > s.y && me.y < s.y+s.h) speed = 9;
+                if(me.x > s.x && me.x < s.x+s.w && me.y > s.y && me.y < s.y+s.h) speed *= 1.5;
             });
 
             let nx = me.x + mx * speed, ny = me.y + my * (speed*0.75);
-
             let hit = false;
-            obstacles.forEach(o => {
-                if(nx > o.x && nx < o.x+o.w && ny > o.y && ny < o.y+o.h && me.z < 20) hit = true;
-            });
+            obstacles.forEach(o => { if(nx > o.x && nx < o.x+o.w && ny > o.y && ny < o.y+o.h && me.z < 20) hit = true; });
             if(!hit) { me.x = nx; me.y = ny; }
 
-            lavaZones.forEach(l => {
-                if(me.x > l.x && me.x < l.x+l.w && me.y > l.y && me.y < l.y+l.h && me.ground) { me.x = 300; me.y = 300; }
-            });
+            lavaZones.forEach(l => { if(me.x > l.x && me.x < l.x+l.w && me.y > l.y && me.y < l.y+l.h && me.ground) { me.x = 300; me.y = 300; }});
 
             if(!me.ground) {
                 me.z += me.jv; me.jv -= 0.6;
@@ -202,18 +218,16 @@
             me.x = Math.max(20, Math.min(canvas.width-20, me.x));
             me.y = Math.max(20, Math.min(canvas.height-20, me.y));
 
-            if(socket && socket.connected) {
-                socket.emit('move', { x: me.x, y: me.y, z: me.z, color: colorPicker.value, nick: me.nick });
-            }
+            if(socket?.connected) socket.emit('move', { x: me.x, y: me.y, z: me.z, color: colorPicker.value, nick: me.nick });
             
-            if(Math.abs(mx) > 0.1 || Math.abs(my) > 0.1) trails.push({x: me.x, y: me.y - me.z, a: 1.0});
-            if(trails.length > 15) trails.shift();
+            if(Math.abs(mx) > 0.1 || Math.abs(my) > 0.1 || me.dashTimer > 0) {
+                trails.push({x: me.x, y: me.y - me.z, a: 1.0, dash: me.dashTimer > 0});
+            }
+            if(trails.length > 20) trails.shift();
         }
 
         function draw() {
             ctx.fillStyle = "#567d46"; ctx.fillRect(0,0,canvas.width, canvas.height);
-            
-            // Draw Map elements
             ctx.fillStyle = "#f1c40f"; speedPads.forEach(s => ctx.fillRect(s.x, s.y, s.w, s.h));
             ctx.fillStyle = "#e74c3c"; lavaZones.forEach(l => ctx.fillRect(l.x, l.y, l.w, l.h));
             ctx.fillStyle = "#2c3e50"; obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
@@ -227,23 +241,22 @@
                 }
             });
 
-            // Coin
             ctx.fillStyle = "#f1c40f"; ctx.beginPath(); ctx.arc(coin.x, coin.y, 10, 0, 7); ctx.fill();
             ctx.strokeStyle = "white"; ctx.stroke();
 
-            // Trails
-            trails.forEach(t => { t.a -= 0.05; ctx.fillStyle = `rgba(255,255,255,${t.a})`; ctx.fillRect(t.x-2, t.y+10, 4, 4); });
+            trails.forEach(t => { 
+                t.a -= 0.05; 
+                ctx.fillStyle = t.dash ? `rgba(52, 152, 219, ${t.a})` : `rgba(255,255,255,${t.a})`; 
+                ctx.fillRect(t.x-2, t.y+10, t.dash?6:4, t.dash?6:4); 
+            });
 
-            // DRAW OTHERS
             Object.keys(players).forEach(id => {
                 if(id !== myId) {
                     const p = players[id];
                     drawCube(p.x, p.y, p.z, p.color, p.nick, false, p.lastMsg);
                 }
             });
-
-            // DRAW ME (Instant local position)
-            const myLastMsg = players[myId] ? players[myId].lastMsg : "";
+            const myLastMsg = players[myId]?.lastMsg || "";
             drawCube(me.x, me.y, me.z, colorPicker.value, me.nick, true, myLastMsg);
 
             update();
