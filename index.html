@@ -1,81 +1,90 @@
-<!DOCTYPE html><html><head>
+<!DOCTYPE html>
+<html>
+<head>
     <title>Super Cube World</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <style>
         body { margin: 0; background: #222; font-family: 'Segoe UI', sans-serif; overflow: hidden; touch-action: none; position: fixed; width: 100%; height: 100%; }
         canvas { display: none; border: 6px solid #333; margin: 0 auto; background: #567d46; cursor: crosshair; }
-        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 100; }
-        .login-box { background: white; padding: 30px; border-radius: 20px; display: flex; flex-direction: column; gap: 15px; width: 280px; text-align: center; }
-        .login-box input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; }
+        
+        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 100; }
+        .login-box { background: white; padding: 30px; border-radius: 20px; display: flex; flex-direction: column; gap: 15px; width: 280px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .login-box input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; outline: none; }
         .login-box button { padding: 12px; background: #e67e22; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         
-        .ui-panel { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.9); padding: 8px 15px; border-radius: 25px; z-index: 10; display: none; gap: 10px; align-items: center; }
-        #leaderboard { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; padding: 10px; border-radius: 10px; font-size: 12px; min-width: 100px; display: none; }
+        .ui-panel { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.9); padding: 8px 15px; border-radius: 25px; z-index: 10; display: none; gap: 10px; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        #leaderboard { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 12px; border-radius: 12px; font-size: 12px; min-width: 110px; display: none; backdrop-filter: blur(5px); }
         
-        /* Fixed Chat CSS */
-        #chat-container { position: absolute; bottom: 120px; left: 15px; width: 220px; pointer-events: none; z-index: 50; }
-        #chat-messages { height: 120px; overflow: hidden; display: flex; flex-direction: column-reverse; gap: 4px; }
-        .message { background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; width: fit-content; pointer-events: none; }
-        #chat-input { width: 100%; background: white; border: 2px solid #3498db; padding: 10px; visibility: hidden; pointer-events: auto; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); outline: none; }
+        #chat-container { position: absolute; bottom: 120px; left: 20px; width: 240px; pointer-events: none; z-index: 50; }
+        #chat-messages { height: 130px; overflow: hidden; display: flex; flex-direction: column-reverse; gap: 5px; margin-bottom: 10px; }
+        .message { background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 6px; font-size: 12px; width: fit-content; }
+        #chat-input { width: 100%; background: white; border: 3px solid #3498db; padding: 12px; visibility: hidden; pointer-events: auto; border-radius: 10px; outline: none; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         
         #mobile-controls { position: absolute; bottom: 30px; width: 100%; display: none; justify-content: space-between; padding: 0 30px; box-sizing: border-box; pointer-events: none; }
         .joy-base { width: 90px; height: 90px; background: rgba(255,255,255,0.2); border: 3px solid white; border-radius: 50%; position: relative; pointer-events: auto; }
         #stick { width: 35px; height: 35px; background: white; border-radius: 50%; position: absolute; left: 27.5px; top: 27.5px; }
-        .m-btn { width: 65px; height: 65px; background: rgba(255,255,255,0.3); border: 2px solid white; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: auto; user-select: none; }
-    </style></head><body>
+        .m-btn { width: 65px; height: 65px; background: rgba(0,0,0,0.4); border: 2px solid white; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: auto; user-select: none; }
+    </style>
+</head>
+<body>
 
     <div id="login-overlay">
         <div class="login-box">
-            <h2 style="margin:0">CUBE WORLD</h2>
+            <h1 style="margin:0; color:#333">CUBE WORLD</h1>
             <input type="text" id="username" placeholder="Nickname" maxlength="10">
-            <button id="start-btn">PLAY</button>
+            <button id="start-btn">PLAY NOW</button>
+            <p style="font-size:10px; color:#666">Controls: WASD to move, Space to Jump<br>/ to Chat, Enter to Send</p>
         </div>
     </div>
 
-    <div id="leaderboard"><b>Top Cubes:</b><div id="scores"></div></div>
+    <div id="leaderboard"><b>Top Players</b><hr><div id="scores"></div></div>
 
     <div class="ui-panel" id="ui">
         <input type="color" id="colorPicker" value="#3498db">
-        <span id="display-name" style="font-weight:bold;"></span>
+        <span id="display-name" style="font-weight:bold; color:#333"></span>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
     <div id="chat-container">
         <div id="chat-messages"></div>
-        <input type="text" id="chat-input" placeholder="Type message..." maxlength="35">
+        <input type="text" id="chat-input" placeholder="Type a message..." maxlength="35">
     </div>
 
     <div id="mobile-controls">
         <div class="joy-base" id="joyBase"><div id="stick"></div></div>
         <div style="display:flex; flex-direction:column; gap:10px;">
             <div id="chat-btn" class="m-btn">CHAT</div>
-            <div id="jump-btn" class="m-btn" style="background:#e67e22">JUMP</div>
+            <div id="jump-btn" class="m-btn" style="background:#e67e22; border:none;">JUMP</div>
         </div>
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        const SERVER_URL = "https://two-5d-game.onrender.com"; 
+        const SERVER_URL = "https://two-5d-game.onrender.com"; // <-- Update this!
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const chatInput = document.getElementById('chat-input');
+        
         let socket, myId = null;
         let players = {}, coin = {x:0, y:0}, trails = [];
         const me = { x: 300, y: 300, z: 0, jv: 0, ground: true, ix: 0, iy: 0, nick: "", score: 0 };
         const keys = {};
 
-        // Decorations
+        // Environment Decor
         const decos = [];
-        for(let i=0; i<15; i++) {
-            decos.push({ x: Math.random()*1500, y: Math.random()*1000, type: Math.random() > 0.5 ? 'tree' : 'flower' });
+        for(let i=0; i<20; i++) {
+            decos.push({ x: Math.random()*2000, y: Math.random()*2000, type: Math.random() > 0.6 ? 'tree' : 'flower' });
         }
 
-        const obstacles = [{x: 150, y: 150, w: 100, h: 40}, {x: 500, y: 400, w: 80, h: 80}];
-        const lavaZones = [{x: 300, y: 100, w: 200, h: 60}];
-        const speedPads = [{x: 50, y: 400, w: 40, h: 40}];
+        const obstacles = [{x: 200, y: 200, w: 100, h: 40}, {x: 600, y: 300, w: 80, h: 80}];
+        const lavaZones = [{x: 400, y: 100, w: 200, h: 60}];
+        const speedPads = [{x: 100, y: 500, w: 50, h: 50}];
 
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        function resize() { 
+            canvas.width = window.innerWidth; 
+            canvas.height = window.innerHeight; 
+        }
         window.onresize = resize; resize();
 
         document.getElementById('start-btn').onclick = () => {
@@ -97,13 +106,12 @@
             socket.on('init', (data) => { 
                 myId = data.id; 
                 coin = data.coin; 
-                // Send initial position
-                socket.emit('move', { x: me.x, y: me.y, z: me.z, color: document.getElementById('colorPicker').value, nick: me.nick });
+                socket.emit('move', { x: me.x, y: me.y, z: me.z, color: colorPicker.value, nick: me.nick });
             });
             socket.on('updatePlayers', (data) => { 
                 players = data; 
                 const list = Object.values(players).sort((a,b) => b.score - a.score).slice(0,5);
-                document.getElementById('scores').innerHTML = list.map(p => `<div>${p.nick}: ${p.score}</div>`).join('');
+                document.getElementById('scores').innerHTML = list.map(p => `<div>${p.nick}: <b>${p.score}</b></div>`).join('');
             });
             socket.on('coinUpdate', (c) => { coin = c; });
             socket.on('newChatMessage', (data) => {
@@ -114,29 +122,49 @@
             });
         }
 
-        function toggleChat() {
+        // --- IMPROVED CHAT LOGIC ---
+        function toggleChat(forceOpen = false) {
+            if (forceOpen) {
+                chatInput.style.visibility = 'visible';
+                chatInput.focus();
+                return;
+            }
             if (chatInput.style.visibility === 'visible') {
                 if (chatInput.value.trim() && socket) socket.emit('chatMessage', chatInput.value.trim());
-                chatInput.value = ''; chatInput.style.visibility = 'hidden'; chatInput.blur();
-            } else { chatInput.style.visibility = 'visible'; chatInput.focus(); }
+                chatInput.value = '';
+                chatInput.style.visibility = 'hidden';
+                chatInput.blur();
+            } else {
+                chatInput.style.visibility = 'visible';
+                chatInput.focus();
+            }
         }
 
-        document.getElementById('chat-btn').ontouchstart = (e) => { e.preventDefault(); toggleChat(); };
+        // --- CONTROLS ---
         window.onkeydown = (e) => { 
-            if(e.key === ' ' && me.ground) { me.jv = 10; me.ground = false; }
+            if(e.key === ' ' && me.ground && document.activeElement !== chatInput) { 
+                me.jv = 11; me.ground = false; 
+            }
             if(e.key === 'Enter') toggleChat();
+            if(e.key === '/') { 
+                if(document.activeElement !== chatInput) {
+                    e.preventDefault(); 
+                    toggleChat(true); 
+                }
+            }
             keys[e.key.toLowerCase()] = true; 
         };
         window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
-        document.getElementById('jump-btn').ontouchstart = (e) => { e.preventDefault(); if(me.ground) { me.jv=10; me.ground=false; }};
+
+        document.getElementById('chat-btn').ontouchstart = (e) => { e.preventDefault(); toggleChat(); };
+        document.getElementById('jump-btn').ontouchstart = (e) => { e.preventDefault(); if(me.ground) { me.jv=11; me.ground=false; }};
 
         // Joystick
         const jBase = document.getElementById('joyBase'), stick = document.getElementById('stick');
         jBase.ontouchstart = jBase.ontouchmove = (e) => {
             e.preventDefault();
             const r = jBase.getBoundingClientRect();
-            const touch = e.touches[0];
-            const dx = touch.clientX - (r.left + 45), dy = touch.clientY - (r.top + 45);
+            const dx = e.touches[0].clientX - (r.left + 45), dy = e.touches[0].clientY - (r.top + 45);
             const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 35), ang = Math.atan2(dy, dx);
             me.ix = (Math.cos(ang) * dist) / 35; me.iy = (Math.sin(ang) * dist) / 35;
             stick.style.transform = `translate(${Math.cos(ang)*dist}px, ${Math.sin(ang)*dist}px)`;
@@ -146,7 +174,9 @@
         function update() {
             let speed = 4.5;
             let mx = me.ix, my = me.iy;
-            if(keys['w']) my = -1; if(keys['s']) my = 1; if(keys['a']) mx = -1; if(keys['d']) mx = 1;
+            if(document.activeElement !== chatInput) {
+                if(keys['w']) my = -1; if(keys['s']) my = 1; if(keys['a']) mx = -1; if(keys['d']) mx = 1;
+            }
 
             speedPads.forEach(s => {
                 if(me.x > s.x && me.x < s.x+s.w && me.y > s.y && me.y < s.y+s.h) speed = 9;
@@ -172,9 +202,8 @@
             me.x = Math.max(20, Math.min(canvas.width-20, me.x));
             me.y = Math.max(20, Math.min(canvas.height-20, me.y));
 
-            // Sync move to server
             if(socket && socket.connected) {
-                socket.emit('move', { x: me.x, y: me.y, z: me.z, color: document.getElementById('colorPicker').value, nick: me.nick });
+                socket.emit('move', { x: me.x, y: me.y, z: me.z, color: colorPicker.value, nick: me.nick });
             }
             
             if(Math.abs(mx) > 0.1 || Math.abs(my) > 0.1) trails.push({x: me.x, y: me.y - me.z, a: 1.0});
@@ -184,11 +213,11 @@
         function draw() {
             ctx.fillStyle = "#567d46"; ctx.fillRect(0,0,canvas.width, canvas.height);
             
+            // Draw Map elements
             ctx.fillStyle = "#f1c40f"; speedPads.forEach(s => ctx.fillRect(s.x, s.y, s.w, s.h));
             ctx.fillStyle = "#e74c3c"; lavaZones.forEach(l => ctx.fillRect(l.x, l.y, l.w, l.h));
             ctx.fillStyle = "#2c3e50"; obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
 
-            // Decorations
             decos.forEach(d => {
                 if(d.type === 'tree') {
                     ctx.fillStyle = "#3e2723"; ctx.fillRect(d.x-3, d.y-15, 6, 15);
@@ -213,9 +242,9 @@
                 }
             });
 
-            // DRAW LOCAL PLAYER (Always uses "me" variables for instant response)
+            // DRAW ME (Instant local position)
             const myLastMsg = players[myId] ? players[myId].lastMsg : "";
-            drawCube(me.x, me.y, me.z, document.getElementById('colorPicker').value, me.nick, true, myLastMsg);
+            drawCube(me.x, me.y, me.z, colorPicker.value, me.nick, true, myLastMsg);
 
             update();
             requestAnimationFrame(draw);
@@ -225,14 +254,14 @@
             const dy = y - (z || 0) - 30;
             ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.beginPath(); ctx.ellipse(x, y, 15, 8, 0, 0, 7); ctx.fill();
             ctx.fillStyle = color; ctx.fillRect(x-12, dy, 24, 30);
-            if(isMe) { ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.strokeRect(x-12, dy, 24, 30); }
-            ctx.fillStyle = "white"; ctx.font = "bold 12px Arial"; ctx.textAlign = "center";
-            ctx.fillText(nick, x, dy-10);
+            if(isMe) { ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.strokeRect(x-12, dy, 24, 30); }
+            ctx.fillStyle = "white"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
+            ctx.fillText(nick, x, dy-12);
             if(msg) {
-                ctx.fillStyle = "white"; ctx.fillRect(x-45, dy-45, 90, 22);
-                ctx.fillStyle = "black"; ctx.font = "10px Arial"; ctx.fillText(msg.substring(0,15), x, dy-30);
+                ctx.fillStyle = "white"; ctx.fillRect(x-45, dy-50, 90, 22);
+                ctx.fillStyle = "black"; ctx.font = "10px sans-serif"; ctx.fillText(msg.substring(0,15), x, dy-35);
             }
         }
     </script>
-   </body></html>
-
+</body>
+</html>
