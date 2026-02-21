@@ -54,31 +54,7 @@ io.on('connection', (socket) => {
         io.emit('updatePlayers', players); 
     });
 });
-let enemies = [];
-
-function spawnEnemy() {
-    if (enemies.length < 10) {
-        enemies.push({
-            id: Math.random(),
-            x: Math.random() * 1000,
-            y: Math.random() * 1000,
-            speed: 1 + Math.random()
-        });
-        io.emit('enemyUpdate', enemies);
-    }
-}
-setInterval(spawnEnemy, 3000); // Spawn enemy every 3 seconds
-
-io.on('connection', (socket) => {
-    socket.emit('enemyUpdate', enemies);
-
-    socket.on('destroyEnemy', (enemyId) => {
-        enemies = enemies.filter(e => e.id !== enemyId);
-        io.emit('enemyUpdate', enemies);
-    });
-    
-    // ... (rest of your existing socket logic)
-});
 
 server.listen(process.env.PORT || 3000);
+
 
